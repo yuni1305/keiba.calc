@@ -5,28 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>競馬・資金配分最適化</title>
     <style>
-        :root { --primary: #1b4332; --accent: #2d6a4f; --danger: #e63946; --bg: #f0f2f5; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        :root { --primary: #00b894; --accent: #55efc4; --danger: #ff7675; --bg: #f9fffb; --text: #2d3436; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: var(--text); }
         .container { max-width: 600px; margin: 0 auto; }
-        .card { background: white; padding: 18px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        h3 { margin-top: 0; color: var(--primary); border-left: 4px solid var(--accent); padding-left: 10px; }
+        .card { background: white; padding: 18px; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h3 { margin-top: 0; color: var(--primary); font-size: 18px; display: flex; align-items: center; gap: 8px; }
         .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
         .input-group div { flex: 1; }
-        label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
-        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; background: var(--primary); color: white; padding: 15px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; }
+        label { display: block; font-size: 12px; font-weight: bold; color: #888; margin-bottom: 4px; }
+        input { width: 100%; padding: 14px; border: 2px solid #f1f3f5; border-radius: 10px; font-size: 16px; box-sizing: border-box; background: #f8f9fa; }
+        input:focus { border-color: var(--accent); outline: none; background: #fff; }
+        button { width: 100%; background: var(--primary); color: white; padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,184,148,0.3); }
         
-        /* 横スクロールエリア */
-        .scroll-area { display: flex; overflow-x: auto; gap: 12px; padding-bottom: 10px; }
-        .b-card { min-width: 240px; background: white; border: 1px solid #eee; border-radius: 10px; padding: 12px; font-size: 13px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 6px 2px; border-bottom: 1px solid #f9f9f9; text-align: right; }
+        /* 結果エリア */
+        .scroll-area { display: flex; overflow-x: auto; gap: 12px; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
+        .b-card { min-width: 220px; background: white; border: 1px solid #e0e0e0; border-radius: 14px; padding: 15px; flex-shrink: 0; }
+        .b-header { font-weight: bold; font-size: 16px; color: var(--primary); border-bottom: 2px solid var(--accent); margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        td { padding: 8px 2px; border-bottom: 1px solid #f8f9fa; text-align: right; font-size: 14px; }
+        td:first-child { text-align: left; font-weight: 500; }
         
-        /* ランキングエリア */
-        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
-        .rank-number { font-weight: bold; color: var(--accent); font-size: 18px; width: 30px; }
-        .rank-info { flex: 1; margin-left: 10px; }
-        .badge { background: var(--accent); color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        /* ランキング */
+        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 10px; margin-bottom: 8px; background: #fdfdfd; border: 1px solid #f1f3f5; }
+        .rank-number { font-weight: 900; color: var(--primary); font-size: 20px; width: 35px; }
+        .rank-info { flex: 1; font-weight: bold; font-size: 16px; }
+        .roi-badge { padding: 4px 10px; border-radius: 8px; font-weight: bold; font-size: 14px; }
+        .safe { background: #e6faf5; color: var(--primary); }
+        .danger { background: #fff5f5; color: var(--danger); }
     </style>
 </head>
 <body>
@@ -36,19 +41,19 @@
         <h3>🏇 資金配分設定</h3>
         <label>予算範囲（100円刻みで計算）</label>
         <div class="input-group">
-            <div><label>開始</label><input type="number" id="startB" value="500" step="100"></div>
-            <div><label>終了</label><input type="number" id="endB" value="1000" step="100"></div>
+            <div><label>最小</label><input type="number" id="startB" value="500" step="100"></div>
+            <div><label>最大</label><input type="number" id="endB" value="1000" step="100"></div>
         </div>
         <label>オッズ（カンマ区切り）</label>
-        <input type="text" id="odds" value="2.9, 6.8, 16.6">
-        <button onclick="runAnalysis()">一括シミュレーション実行</button>
+        <input type="text" id="odds" value="2.9, 6.8, 16.6" placeholder="2.9, 6.8, 16.6">
+        <button onclick="runAnalysis()">シミュレーション開始</button>
     </div>
 
     <div id="resultsTitle"></div>
     <div id="scrollArea" class="scroll-area"></div>
 
-    <div class="card" id="rankSection" style="display:none;">
-        <h3>🏆 最低回収率ランキング</h3>
+    <div class="card" id="rankSection" style="display:none; border-top: 5px solid var(--primary);">
+        <h3>🏆 回収率ランキング</h3>
         <div id="rankList"></div>
     </div>
 </div>
@@ -59,69 +64,75 @@ function runAnalysis() {
     const endB = parseInt(document.getElementById('endB').value);
     const oddsList = document.getElementById('odds').value.split(',').map(v => parseFloat(v.trim()));
     
-    if (oddsList.some(isNaN) || startB > endB) return alert('入力を確認してください');
+    if (oddsList.some(isNaN) || startB > endB) return alert('数値を正しく入力してください');
 
     const allResults = [];
 
     for (let b = startB; b <= endB; b += 100) {
         const invSum = oddsList.reduce((sum, o) => sum + (1/o), 0);
-        let total = 0;
+        let currentTotal = 0;
         let al = oddsList.map(o => {
             let a = Math.max(100, Math.floor((b * (1/o) / invSum) / 100) * 100);
-            total += a;
+            currentTotal += a;
             return { o: o, a: a };
         });
 
-        while (total + 100 <= b) {
+        // 予算(b)を超えない範囲で余りを最適に配分
+        while (currentTotal + 100 <= b) {
             let target = al.reduce((min, curr) => (curr.a * curr.o < min.a * min.o) ? curr : min);
             target.a += 100;
-            total += 100;
+            currentTotal += 100;
         }
 
-        const minRoi = Math.min(...al.map(a => (a.a * a.o / total) * 100));
-        allResults.push({ budget: b, actualTotal: total, allocations: al, minRoi: minRoi });
+        const minRoi = Math.min(...al.map(a => (a.a * a.o / currentTotal) * 100));
+        allResults.push({ budget: currentTotal, allocations: al, minRoi: minRoi });
     }
 
-    // 1. 横スクロール表示
+    // 重複（同じ投資額になるパターン）を排除
+    const uniqueResults = Array.from(new Map(allResults.map(item => [item.budget, item])).values());
+
+    // 1. 横スワイプエリア
     const scrollArea = document.getElementById('scrollArea');
     scrollArea.innerHTML = '';
-    document.getElementById('resultsTitle').innerHTML = '<h4>計算結果（スワイプで比較）</h4>';
+    document.getElementById('resultsTitle').innerHTML = '<p style="font-weight:bold; color:#666; font-size:13px; margin-left:5px;">📊 詳細（横スワイプ）</p>';
     
-    allResults.forEach(res => {
+    uniqueResults.forEach(res => {
         const div = document.createElement('div');
         div.className = 'b-card';
         div.innerHTML = `
-            <b>目安:${res.budget}円 (計:${res.actualTotal})</b>
+            <div class="b-header">${res.budget}円</div>
             <table>
-                ${res.allocations.map(a => `<tr><td>${a.o}倍</td><td>${a.a}円</td><td>${Math.floor(a.a*a.o)}</td></tr>`).join('')}
+                ${res.allocations.map(a => `<tr><td>${a.o}倍</td><td>${a.a}円</td><td>→ ${Math.floor(a.a*a.o)}</td></tr>`).join('')}
             </table>
-            <div style="text-align:right; margin-top:5px; font-weight:bold; color:${res.minRoi < 100 ? '#e63946' : '#2d6a4f'}">
+            <div style="text-align:right; font-weight:bold; font-size:14px; color:${res.minRoi < 100 ? 'var(--danger)' : 'var(--primary)'}">
                 最低回収: ${res.minRoi.toFixed(1)}%
             </div>
         `;
         scrollArea.appendChild(div);
     });
 
-    // 2. ランキング表示 (最低回収率が高い順)
+    // 2. ランキング表示
     const rankList = document.getElementById('rankList');
     rankList.innerHTML = '';
-    const sorted = [...allResults].sort((a, b) => b.minRoi - a.minRoi);
+    const sorted = [...uniqueResults].sort((a, b) => b.minRoi - a.minRoi);
     
     sorted.forEach((res, i) => {
         const item = document.createElement('div');
         item.className = 'rank-item';
+        const isSafe = res.minRoi >= 100;
         item.innerHTML = `
             <div class="rank-number">${i+1}</div>
-            <div class="rank-info">
-                <b>予算 ${res.budget}円</b> <span class="badge">投資:${res.actualTotal}円</span>
-            </div>
-            <div class="rank-roi ${res.minRoi < 100 ? 'danger' : 'safe'}">
+            <div class="rank-info">投資額: ${res.budget}円</div>
+            <div class="roi-badge ${isSafe ? 'safe' : 'danger'}">
                 ${res.minRoi.toFixed(1)}%
             </div>
         `;
         rankList.appendChild(item);
     });
     document.getElementById('rankSection').style.display = 'block';
+    
+    // ランキングまでスムーズにスクロール
+    window.scrollTo({ top: document.getElementById('rankSection').offsetTop - 20, behavior: 'smooth' });
 }
 </script>
 </body>
