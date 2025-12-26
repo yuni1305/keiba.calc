@@ -1,1 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>競馬 予算別比較シミュレーター</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f8f9fa; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        label { font-size: 14px; font-weight: bold; color: #555; }
+        input { width: 100%; padding: 12px; margin: 8px 0 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; background: #007bff; color: white; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        button:active { background: #0056b3; }
+        .result-container { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 15px; padding-bottom: 10px; }
+        .budget-card { min-width: 250px; background: #fff; border: 2px solid #eef; border-radius: 10px; padding: 15px; flex-shrink: 0; }
+        .budget-header { border-bottom: 2px solid #eee; margin-bottom: 10px; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 8px 4px; border-bottom: 1px solid #f0f0f0; text-align: right; }
+        th { color: #888; text-align: left; }
+        .danger { color: #d9534f; font-weight: bold; }
+        .safe { color: #28a745; font-weight: bold; }
+        .summary-box { background: #f0f7ff; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
 
+<div class="card">
+    <h3>🏇 予算別比較シミュレーター</h3>
+    <label>比較したい予算 (カンマ区切り)</label>
+    <input type="text" id="budgets" value="500, 1000, 2000" placeholder="500, 1000, 2000">
+    
+    <label>狙うオッズ (カンマ区切り)</label>
+    <input type="text" id="odds" value="2.9, 6.8, 16.6" placeholder="2.9, 6.8, 16.6">
+    
+    <button onclick="compareBudgets()">全パターンを計算</button>
+</div>
+
+<div id="compareArea" class="result-container">
+    </div>
+
+<script>
+function compareBudgets() {
+    const budgetList = document.getElementById('budgets').value.split(',').map(v => parseFloat(v.trim()));
+    const oddsList = document.getElementById('odds').value.split(',').map(v => parseFloat(v.trim()));
+    const area = document.getElementById('compareArea');
+    area.innerHTML = '';
+
+    if (oddsList.some(isNaN)) { alert('オッズを入力してください'); return; }
+
+    budgetList.forEach(budget => {
+        if (isNaN(budget)) return;
+        
+        // --- 計算ロジック ---
+        const invSum = oddsList.reduce((sum, o) => sum + (1/o), 0);
+        let totalInvest = 0;
+        let allocations = oddsList.map(o => {
+            let amt = Math.floor((budget * (1/o) / invSum) / 100) * 100;
+            if (amt < 100) amt = 100;
+            totalInvest += amt;
+            return { odds: o, amount: amt };
+        });
+
+        while (totalInvest + 100 <= budget) {
+            let target = allocations.reduce((min, curr) => 
+                (curr.amount * curr.odds < min.amount * min.odds) ? curr : min
+            );
+            target.amount += 100;
+            totalInvest += 100;
+        }
+
+        let minRoi = Math.min(...allocations.map(a => (a.amount * a.odds / totalInvest) * 100));
+
+        // --- HTML生成 ---
+        const card = document.createElement('div');
+        card.className = 'budget-card';
+        let tableRows = allocations.map((a, i) => {
+            const roi = (a.amount * a.odds / totalInvest) * 100;
+            return `<tr><td>${a.odds}</td><td>${a.amount}</td><td>${Math.floor(a.amount * a.odds)}</td><td class="${roi < 100 ? 'danger' : 'safe'}">${roi.toFixed(0)}%</td></tr>`;
+        }).join('');
+
+        card.innerHTML = `
+            <div class="budget-header">
+                <b>予算目安: ${budget}円</b>
+            </div>
+            <table>
+                <thead><tr><th>オッズ</th><th>購入</th><th>払戻</th><th>回収</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <div class="summary-box">
+                投資計: <b>${totalInvest}円</b><br>
+                最低回収率: <span class="${minRoi < 100 ? 'danger' : 'safe'}">${minRoi.toFixed(1)}%</span>
+            </div>
+        `;
+        area.appendChild(card);
+    });
+}
+</script>
+
+</body>
+</html>
