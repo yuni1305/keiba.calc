@@ -14,25 +14,23 @@
         .input-group div { flex: 1; }
         label { display: block; font-size: 12px; font-weight: bold; color: #7f8c8d; margin-bottom: 4px; }
         input { width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 16px; box-sizing: border-box; background: #fff; }
-        input:focus { border-color: var(--primary); outline: none; }
-        button { width: 100%; background: var(--primary); color: white; padding: 16px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        button:active { background: #081c15; }
+        button { width: 100%; background: var(--primary); color: white; padding: 16px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
         
-        .scroll-area { display: flex; overflow-x: auto; gap: 12px; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
-        .b-card { min-width: 220px; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 15px; flex-shrink: 0; }
+        .scroll-area { display: flex; overflow-x: auto; gap: 12px; padding-bottom: 10px; }
+        .b-card { min-width: 230px; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 15px; flex-shrink: 0; }
         .b-header { font-weight: bold; font-size: 15px; color: var(--primary); border-bottom: 1px solid var(--primary); margin-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-        td { padding: 8px 2px; border-bottom: 1px solid #f1f1f1; text-align: right; font-size: 14px; }
-        td:first-child { text-align: left; font-weight: 500; }
         
-        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; background: #fff; }
-        .rank-number { font-weight: bold; color: var(--primary); font-size: 16px; width: 30px; }
-        .rank-info { flex: 1; font-weight: 500; font-size: 14px; line-height: 1.4; }
-        .rank-info b { font-size: 16px; color: var(--primary); }
-        .roi-badge { padding: 6px 8px; border-radius: 2px; font-weight: bold; font-size: 13px; min-width: 80px; text-align: right; line-height: 1.2; }
-        .safe { border: 1px solid var(--primary); color: var(--primary); background: #f0fdf4; }
-        .danger { border: 1px solid var(--danger); color: var(--danger); background: #fff5f5; }
-        .profit-text { display: block; font-size: 11px; margin-top: 2px; }
+        /* ランキング表のスタイル */
+        .rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .rank-table th { background: #f8f9fa; color: #7f8c8d; font-size: 11px; padding: 8px 4px; border-bottom: 2px solid #eee; }
+        .rank-table td { padding: 12px 4px; border-bottom: 1px solid #eee; text-align: center; }
+        .rank-table .rank-col { font-weight: bold; color: var(--primary); width: 10%; }
+        .rank-table .budget-col { font-weight: bold; width: 30%; text-align: right; }
+        .rank-table .roi-col { width: 30%; font-weight: bold; }
+        .rank-table .profit-col { width: 30%; text-align: right; }
+        
+        .safe { color: var(--primary); }
+        .danger { color: var(--danger); }
     </style>
 </head>
 <body>
@@ -46,7 +44,7 @@
             <div><label>最大</label><input type="number" id="endB" value="2000" step="100"></div>
         </div>
         <label>オッズ（カンマ区切り）</label>
-        <input type="text" id="odds" value="2.9, 6.8, 16.6" placeholder="2.9, 6.8, 16.6">
+        <input type="text" id="odds" value="2.9, 6.8, 16.6">
         <button onclick="runAnalysis()">シミュレーション実行</button>
     </div>
 
@@ -55,7 +53,17 @@
 
     <div class="card" id="rankSection" style="display:none;">
         <h3>回収率ランキング</h3>
-        <div id="rankList"></div>
+        <table class="rank-table">
+            <thead>
+                <tr>
+                    <th>順位</th>
+                    <th>予算</th>
+                    <th>回収率</th>
+                    <th>最低利益</th>
+                </tr>
+            </thead>
+            <tbody id="rankList"></tbody>
+        </table>
     </div>
 </div>
 
@@ -65,10 +73,9 @@ function runAnalysis() {
     const endB = parseInt(document.getElementById('endB').value);
     const oddsList = document.getElementById('odds').value.split(',').map(v => parseFloat(v.trim()));
     
-    if (oddsList.some(isNaN) || startB > endB) return alert('入力値を確認してください');
+    if (oddsList.some(isNaN) || startB > endB) return alert('入力を確認してください');
 
     const allResults = [];
-
     for (let b = startB; b <= endB; b += 100) {
         const invSum = oddsList.reduce((sum, o) => sum + (1/o), 0);
         let currentTotal = 0;
@@ -77,60 +84,51 @@ function runAnalysis() {
             currentTotal += a;
             return { o: o, a: a };
         });
-
         while (currentTotal + 100 <= b) {
             let target = al.reduce((min, curr) => (curr.a * curr.o < min.a * min.o) ? curr : min);
             target.a += 100;
             currentTotal += 100;
         }
-
         const minPayout = Math.min(...al.map(a => a.a * a.o));
-        const minProfit = minPayout - currentTotal;
+        const minProfit = Math.floor(minPayout - currentTotal);
         const minRoi = (minPayout / currentTotal) * 100;
-        
-        allResults.push({ budget: currentTotal, allocations: al, minRoi: minRoi, minProfit: Math.floor(minProfit) });
+        allResults.push({ budget: currentTotal, allocations: al, minRoi: minRoi, minProfit: minProfit });
     }
 
     const uniqueResults = Array.from(new Map(allResults.map(item => [item.budget, item])).values());
 
+    // 詳細比較
     const scrollArea = document.getElementById('scrollArea');
     scrollArea.innerHTML = '';
-    document.getElementById('resultsTitle').innerHTML = '<p style="font-weight:bold; color:#7f8c8d; font-size:12px; margin-left:5px; margin-bottom:8px;">詳細比較</p>';
-    
+    document.getElementById('resultsTitle').innerHTML = '<p style="font-weight:bold; color:#7f8c8d; font-size:12px; margin:0 0 8px 5px;">詳細比較</p>';
     uniqueResults.forEach(res => {
         const div = document.createElement('div');
         div.className = 'b-card';
         div.innerHTML = `
             <div class="b-header">予算: ${res.budget}円</div>
-            <table>
-                ${res.allocations.map(a => `<tr><td>${a.o}倍</td><td>${a.a}円</td><td>${Math.floor(a.a*a.o)}</td></tr>`).join('')}
+            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                ${res.allocations.map(a => `<tr><td style="text-align:left;">${a.o}倍</td><td style="text-align:right;">${a.a}円</td><td style="text-align:right;">${Math.floor(a.a*a.o)}円</td></tr>`).join('')}
             </table>
-            <div style="text-align:right; font-weight:bold; font-size:13px; color:${res.minRoi < 100 ? 'var(--danger)' : 'var(--primary)'}">
-                最低回収: ${res.minRoi.toFixed(1)}%
-            </div>
+            <div style="text-align:right; font-weight:bold; font-size:13px; margin-top:8px; color:${res.minRoi < 100 ? 'var(--danger)' : 'var(--primary)'}">最低回収: ${res.minRoi.toFixed(1)}%</div>
         `;
         scrollArea.appendChild(div);
     });
 
+    // ランキング表
     const rankList = document.getElementById('rankList');
     rankList.innerHTML = '';
     const sorted = [...uniqueResults].sort((a, b) => b.minRoi - a.minRoi);
     
     sorted.forEach((res, i) => {
-        const item = document.createElement('div');
-        item.className = 'rank-item';
-        const isSafe = res.minRoi >= 100;
-        item.innerHTML = `
-            <div class="rank-number">${i+1}</div>
-            <div class="rank-info">
-                予算 <b>${res.budget}円</b>
-            </div>
-            <div class="roi-badge ${isSafe ? 'safe' : 'danger'}">
-                ${res.minRoi.toFixed(1)}%
-                <span class="profit-text">利益: ${res.minProfit > 0 ? '+' : ''}${res.minProfit}円</span>
-            </div>
+        const row = document.createElement('tr');
+        const roiClass = res.minRoi < 100 ? 'danger' : 'safe';
+        row.innerHTML = `
+            <td class="rank-col">${i+1}</td>
+            <td class="budget-col">${res.budget}円</td>
+            <td class="roi-col ${roiClass}">${res.minRoi.toFixed(1)}%</td>
+            <td class="profit-col ${roiClass}">${res.minProfit > 0 ? '+' : ''}${res.minProfit}円</td>
         `;
-        rankList.appendChild(item);
+        rankList.appendChild(row);
     });
     document.getElementById('rankSection').style.display = 'block';
 }
