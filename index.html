@@ -17,16 +17,20 @@
         textarea { height: 100px; font-family: monospace; font-size: 14px; margin-bottom: 10px; }
         
         .option-box { background: #f8f9fa; padding: 12px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid var(--accent); }
-        .checkbox-label { display: flex; align-items: center; font-size: 14px; font-weight: bold; cursor: pointer; color: var(--primary); margin-bottom: 8px; }
-        .checkbox-label:last-child { margin-bottom: 0; }
+        .checkbox-label { display: flex; align-items: center; font-size: 14px; font-weight: bold; cursor: pointer; color: var(--primary); }
         .checkbox-label input { width: auto; margin-right: 10px; }
 
         button { width: 100%; background: var(--primary); color: white; padding: 16px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
         
+        /* 合成オッズ表示 */
+        .summary-box { background: #fff; border: 1px dashed var(--accent); padding: 12px; border-radius: 4px; margin-bottom: 20px; text-align: center; }
+        .syn-label { font-size: 12px; color: #666; display: block; }
+        .syn-value { font-size: 24px; font-weight: bold; color: #d35400; }
+
         .best-plan { background: #e9f5ee; border: 2px solid var(--primary); padding: 15px; border-radius: 4px; margin-bottom: 20px; }
         .best-plan h4 { margin: 0 0 10px 0; color: var(--primary); font-size: 15px; }
 
-        .rank-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        .rank-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
         .rank-table th { background: #f8f9fa; font-size: 10px; padding: 8px 2px; border-bottom: 2px solid #eee; }
         .rank-table td { padding: 10px 2px; border-bottom: 1px solid #eee; text-align: center; }
         
@@ -36,7 +40,6 @@
 
         .safe { color: var(--primary); font-weight: bold; }
         .danger { color: var(--danger); font-weight: bold; }
-        .syn-odds { color: #d35400; font-weight: bold; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -56,12 +59,14 @@
             <label class="checkbox-label">
                 <input type="checkbox" id="motoGaeshi"> 人気1頭を「元返し」にする
             </label>
-            <label class="checkbox-label">
-                <input type="checkbox" id="showSynthetic"> 合成オッズを表示する
-            </label>
         </div>
 
         <button onclick="runAnalysis()">シミュレーション実行</button>
+    </div>
+
+    <div id="summarySection" style="display:none;" class="summary-box">
+        <span class="syn-label">選択した組み合わせの合成オッズ</span>
+        <span id="synValue" class="syn-value">--</span><span style="color:#d35400; font-weight:bold;"> 倍</span>
     </div>
 
     <div id="bestSection" style="display:none;"></div>
@@ -73,8 +78,8 @@
                 <tr>
                     <th>順位</th>
                     <th>予算</th>
-                    <th id="thRoi">回収率(最悪〜最高)</th>
-                    <th id="thProfit">利益(最悪〜最高)</th>
+                    <th>回収率(最悪〜最高)</th>
+                    <th>利益(最悪〜最高)</th>
                 </tr>
             </thead>
             <tbody id="rankList"></tbody>
@@ -90,7 +95,6 @@ function runAnalysis() {
     const startB = parseInt(document.getElementById('startB').value);
     const endB = parseInt(document.getElementById('endB').value);
     const isMotoGaeshi = document.getElementById('motoGaeshi').checked;
-    const isShowSynthetic = document.getElementById('showSynthetic').checked;
     const rawText = document.getElementById('rawInput').value.trim();
     
     const lines = rawText.split('\n');
@@ -106,6 +110,11 @@ function runAnalysis() {
 
     if (dataList.length === 0 || startB > endB) return alert('入力データがありません');
     dataList.sort((a, b) => a.odds - b.odds);
+
+    // 合成オッズを計算（全予算共通）
+    const syntheticOdds = 1 / dataList.reduce((sum, d) => sum + (1 / d.odds), 0);
+    document.getElementById('synValue').innerText = syntheticOdds.toFixed(2);
+    document.getElementById('summarySection').style.display = 'block';
 
     const allResults = [];
     for (let b = startB; b <= endB; b += 100) {
@@ -146,66 +155,42 @@ function runAnalysis() {
         const minProfit = Math.floor(Math.min(...payouts) - currentTotal);
         const maxProfit = Math.floor(Math.max(...payouts) - currentTotal);
         
-        // 合成オッズの計算: 1 / (1/o1 + 1/o2 + ...)
-        const syntheticOdds = 1 / dataList.reduce((sum, d) => sum + (1 / d.odds), 0);
-        
-        allResults.push({ budget: currentTotal, allocations: al, minRoi, maxRoi, minProfit, maxProfit, syntheticOdds });
+        allResults.push({ budget: currentTotal, allocations: al, minRoi, maxRoi, minProfit, maxProfit });
     }
 
     const uniqueResults = Array.from(new Map(allResults.map(item => [item.budget, item])).values());
     const sorted = [...uniqueResults].sort((a, b) => b.minRoi - a.minRoi);
 
+    // 推奨プラン
     const best = sorted[0];
     const bestSec = document.getElementById('bestSection');
     bestSec.style.display = 'block';
-    let bestHtml = `<div class="card best-plan"><h4>🏆 推奨予算: ${best.budget}円</h4>`;
-    bestHtml += `<div style="font-size:13px;">回収期待: <b>${best.minRoi.toFixed(1)}% 〜 ${best.maxRoi.toFixed(1)}%</b></div>`;
-    if (isShowSynthetic) {
-        bestHtml += `<div class="syn-odds" style="margin-top:5px;">合成オッズ: ${best.syntheticOdds.toFixed(2)}倍</div>`;
-    }
-    bestHtml += `</div>`;
-    bestSec.innerHTML = bestHtml;
+    bestSec.innerHTML = `<div class="card best-plan"><h4>🏆 推奨予算: ${best.budget}円</h4><div style="font-size:13px;">回収期待: <b>${best.minRoi.toFixed(1)}% 〜 ${best.maxRoi.toFixed(1)}%</b></div></div>`;
 
-    // ヘッダー切り替え
-    document.getElementById('thRoi').innerText = isShowSynthetic ? "回収率 / 合成" : "回収率(最悪〜最高)";
-
+    // ランキング
     const rankList = document.getElementById('rankList');
     rankList.innerHTML = '';
     sorted.forEach((res, i) => {
         const row = document.createElement('tr');
         const roiClass = res.minRoi < 100 ? 'danger' : 'safe';
-        let roiCell = `${res.minRoi.toFixed(0)}%〜${res.maxRoi.toFixed(0)}%`;
-        if (isShowSynthetic) {
-            roiCell = `<div>${res.minRoi.toFixed(0)}%〜${res.maxRoi.toFixed(0)}%</div><div class="syn-odds">${res.syntheticOdds.toFixed(2)}倍</div>`;
-        }
-        
-        row.innerHTML = `
-            <td>${i+1}</td>
-            <td style="text-align:right;"><b>${res.budget}</b></td>
-            <td class="${roiClass}">${roiCell}</td>
-            <td style="text-align:right;" class="${roiClass}">${res.minProfit} 〜 ${res.maxProfit}</td>
-        `;
+        row.innerHTML = `<td>${i+1}</td><td style="text-align:right;"><b>${res.budget}</b></td><td class="${roiClass}">${res.minRoi.toFixed(0)}%〜${res.maxRoi.toFixed(0)}%</td><td style="text-align:right;" class="${roiClass}">${res.minProfit}〜${res.maxProfit}</td>`;
         rankList.appendChild(row);
     });
     document.getElementById('rankSection').style.display = 'block';
 
+    // 詳細
     document.getElementById('detailTitle').style.display = 'block';
     const scrollArea = document.getElementById('scrollArea');
     scrollArea.innerHTML = '';
     uniqueResults.forEach(res => {
         const div = document.createElement('div');
         div.className = 'b-card';
-        let footInfo = `${res.minRoi.toFixed(1)}% 〜 ${res.maxRoi.toFixed(1)}%`;
-        if (isShowSynthetic) footInfo += `<br><span class="syn-odds">合成: ${res.syntheticOdds.toFixed(2)}倍</span>`;
-        
         div.innerHTML = `
             <div class="b-header">予算: ${res.budget}円</div>
             <table style="width:100%; font-size:13px; border-collapse:collapse;">
                 ${res.allocations.map(a => `<tr><td style="text-align:left; padding:4px 0;">${a.label}</td><td style="text-align:right;">${a.a}円</td><td style="text-align:right;">${Math.floor(a.a*a.o)}円</td></tr>`).join('')}
             </table>
-            <div style="text-align:right; font-weight:bold; font-size:12px; margin-top:5px; color:${res.minRoi < 100 ? 'var(--danger)' : 'var(--primary)'}">
-                ${footInfo}
-            </div>
+            <div style="text-align:right; font-weight:bold; font-size:12px; margin-top:5px; color:${res.minRoi < 100 ? 'var(--danger)' : 'var(--primary)'}">${res.minRoi.toFixed(1)}% 〜 ${res.maxRoi.toFixed(1)}%</div>
         `;
         scrollArea.appendChild(div);
     });
