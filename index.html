@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>競馬 資金配分シミュレーター</title>
     <style>
-        :root { --primary: #1b4332; --accent: #2d6a4f; --danger: #c0392b; --bg: #f4f7f6; --text: #2c3e50; }
+        :root { --primary: #1b4332; --accent: #2d6a4f; --danger: #c0392b; --bg: #f4f7f6; --text: #2c3e50; --gold: #d4af37; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: var(--text); }
         .container { max-width: 600px; margin: 0 auto; }
         .card { background: white; padding: 18px; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #dee2e6; }
@@ -14,19 +14,24 @@
         .input-group div { flex: 1; }
         label { display: block; font-size: 12px; font-weight: bold; color: #7f8c8d; margin-bottom: 4px; }
         textarea, input { width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 16px; box-sizing: border-box; background: #fff; }
-        textarea { height: 100px; font-family: monospace; font-size: 14px; }
-        button { width: 100%; background: var(--primary); color: white; padding: 16px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        textarea { height: 100px; font-family: monospace; font-size: 14px; margin-bottom: 10px; }
         
-        /* 推奨セクション */
+        /* オプション設定 */
+        .option-box { background: #f8f9fa; padding: 12px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid var(--accent); }
+        .checkbox-label { display: flex; align-items: center; font-size: 14px; font-weight: bold; cursor: pointer; color: var(--primary); }
+        .checkbox-label input { width: auto; margin-right: 10px; }
+
+        button { width: 100%; background: var(--primary); color: white; padding: 16px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        
         .best-plan { background: #e9f5ee; border: 2px solid var(--primary); padding: 15px; border-radius: 4px; margin-bottom: 20px; }
         .best-plan h4 { margin: 0 0 10px 0; color: var(--primary); font-size: 15px; }
-
         .rank-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
         .rank-table th { background: #f8f9fa; font-size: 11px; padding: 8px 4px; border-bottom: 2px solid #eee; }
         .rank-table td { padding: 12px 4px; border-bottom: 1px solid #eee; text-align: center; }
         
         .safe { color: var(--primary); font-weight: bold; }
         .danger { color: var(--danger); font-weight: bold; }
+        .bonus { color: #b8860b; font-weight: bold; } /* 穴馬への上乗せ強調 */
     </style>
 </head>
 <body>
@@ -37,23 +42,33 @@
         <label>予算範囲（100円刻み）</label>
         <div class="input-group">
             <div><label>最小</label><input type="number" id="startB" value="500" step="100"></div>
-            <div><label>最大</label><input type="number" id="endB" value="1000" step="100"></div>
+            <div><label>最大</label><input type="number" id="endB" value="2000" step="100"></div>
         </div>
-        <label>ペーストエリア（馬番とオッズ）</label>
+        <label>ペーストエリア</label>
         <textarea id="rawInput" placeholder="1 3 4  13.9&#10;1 4 6  2.9&#10;1 4 7  6.1"></textarea>
+        
+        <div class="option-box">
+            <label class="checkbox-label">
+                <input type="checkbox" id="motoGaeshi"> 人気1頭を「元返し」にする
+            </label>
+            <div style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 26px;">
+                ※最もオッズが低い馬の利益を削り、穴馬の配当を増やします。
+            </div>
+        </div>
+
         <button onclick="runAnalysis()">シミュレーション実行</button>
     </div>
 
     <div id="bestSection" style="display:none;"></div>
 
     <div class="card" id="rankSection" style="display:none;">
-        <h3>回収率ランキング</h3>
+        <h3>回収率ランキング（最低保障）</h3>
         <table class="rank-table">
             <thead>
                 <tr>
                     <th>順位</th>
                     <th>予算</th>
-                    <th>回収率</th>
+                    <th>最低回収</th>
                     <th>最低利益</th>
                 </tr>
             </thead>
@@ -66,50 +81,86 @@
 function runAnalysis() {
     const startB = parseInt(document.getElementById('startB').value);
     const endB = parseInt(document.getElementById('endB').value);
+    const isMotoGaeshi = document.getElementById('motoGaeshi').checked;
     const rawText = document.getElementById('rawInput').value.trim();
     
-    // 正規表現で馬番（左）とオッズ（右端の数値）を抽出
     const lines = rawText.split('\n');
     const dataList = [];
-    
     lines.forEach(line => {
         const parts = line.trim().split(/\s+/);
         if (parts.length >= 2) {
-            const odds = parseFloat(parts.pop()); // 最後の要素をオッズとして取得
-            const label = parts.join('-'); // 残りを馬番ラベルに
-            if (!isNaN(odds)) {
-                dataList.push({ label, odds });
-            }
+            const odds = parseFloat(parts.pop());
+            const label = parts.join('-');
+            if (!isNaN(odds)) dataList.push({ label, odds });
         }
     });
 
-    if (dataList.length === 0 || startB > endB) return alert('データを正しく入力してください');
+    if (dataList.length === 0 || startB > endB) return alert('入力データがありません');
+
+    // オッズ順にソート（人気順）
+    dataList.sort((a, b) => a.odds - b.odds);
 
     const allResults = [];
     for (let b = startB; b <= endB; b += 100) {
-        const invSum = dataList.reduce((sum, d) => sum + (1/d.odds), 0);
         let currentTotal = 0;
-        let al = dataList.map(d => {
-            let a = Math.max(100, Math.floor((b * (1/d.odds) / invSum) / 100) * 100);
-            currentTotal += a;
-            return { label: d.label, o: d.odds, a: a };
-        });
+        let al = [];
+
+        if (isMotoGaeshi && dataList.length > 1) {
+            // --- 元返しモード ---
+            // 1. まず人気1頭の購入額を「総予算 / オッズ」で決める（元返し分）
+            const favorite = dataList[0];
+            let favAmount = Math.ceil((b / favorite.odds) / 100) * 100;
+            // 2. 残りの予算を他の馬（穴馬）に均等配分する
+            const remainBudget = b - favAmount;
+            if (remainBudget < 100 * (dataList.length - 1)) {
+                 // 予算不足時は通常モードへフォールバック（あるいは最小100円）
+                 favAmount = 100;
+            }
+            
+            al.push({ label: favorite.label, o: favorite.odds, a: favAmount, type: 'fav' });
+            currentTotal += favAmount;
+
+            const holes = dataList.slice(1);
+            const holeInvSum = holes.reduce((sum, h) => sum + (1/h.odds), 0);
+            
+            holes.forEach(h => {
+                let a = Math.max(100, Math.floor((remainBudget * (1/h.odds) / holeInvSum) / 100) * 100);
+                al.push({ label: h.label, o: h.odds, a: a, type: 'hole' });
+                currentTotal += a;
+            });
+        } else {
+            // --- 通常モード (均等) ---
+            const invSum = dataList.reduce((sum, d) => sum + (1/d.odds), 0);
+            al = dataList.map(d => {
+                let a = Math.max(100, Math.floor((b * (1/d.odds) / invSum) / 100) * 100);
+                currentTotal += a;
+                return { label: d.label, o: d.odds, a: a, type: 'norm' };
+            });
+        }
+
+        // 余り予算を払戻が一番少ないところに100円ずつ追加
         while (currentTotal + 100 <= b) {
-            let target = al.reduce((min, curr) => (curr.a * curr.o < min.a * min.o) ? curr : min);
+            let target;
+            if (isMotoGaeshi) {
+                // 元返し時は穴馬(hole)の中だけで追加して夢を追う
+                const holesOnly = al.filter(x => x.type === 'hole');
+                target = (holesOnly.length > 0 ? holesOnly : al).reduce((min, curr) => (curr.a * curr.o < min.a * min.o) ? curr : min);
+            } else {
+                target = al.reduce((min, curr) => (curr.a * curr.o < min.a * min.o) ? curr : min);
+            }
             target.a += 100;
             currentTotal += 100;
         }
+
         const minPayout = Math.min(...al.map(a => a.a * a.o));
         const minProfit = Math.floor(minPayout - currentTotal);
         const minRoi = (minPayout / currentTotal) * 100;
         allResults.push({ budget: currentTotal, allocations: al, minRoi: minRoi, minProfit: minProfit });
     }
 
-    // 重複を排除してソート
     const uniqueResults = Array.from(new Map(allResults.map(item => [item.budget, item])).values());
     const sorted = [...uniqueResults].sort((a, b) => b.minRoi - a.minRoi);
 
-    // 1位の推奨プランを表示
     const best = sorted[0];
     const bestSec = document.getElementById('bestSection');
     bestSec.style.display = 'block';
@@ -119,19 +170,20 @@ function runAnalysis() {
             <table style="width:100%; font-size:14px; border-collapse:collapse;">
                 ${best.allocations.map(a => `
                     <tr>
-                        <td style="padding:8px 0; border-bottom:1px solid #c3d7cc;"><b>${a.label}</b></td>
+                        <td style="padding:8px 0; border-bottom:1px solid #c3d7cc;">
+                            <b>${a.label}</b> ${a.type==='fav' ? '<small>(元返し)</small>':''}
+                        </td>
                         <td style="text-align:right; border-bottom:1px solid #c3d7cc;">${a.o}倍</td>
                         <td style="text-align:right; border-bottom:1px solid #c3d7cc;"><b>${a.a}円</b></td>
                     </tr>
                 `).join('')}
             </table>
             <div style="margin-top:10px; font-size:13px; text-align:right;">
-                この配分で的中時 <b>${Math.floor(best.minRoi)}% (${best.minProfit}円)</b> 以上の利益
+                的中時の最低回収: <b class="${best.minRoi < 100 ? 'danger':'safe'}">${Math.floor(best.minRoi)}% (${best.minProfit}円)</b>
             </div>
         </div>
     `;
 
-    // ランキング表
     const rankList = document.getElementById('rankList');
     rankList.innerHTML = '';
     sorted.forEach((res, i) => {
